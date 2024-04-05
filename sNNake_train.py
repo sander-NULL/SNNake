@@ -4,7 +4,8 @@ Created on May 11, 2022
 @author: sander
 '''
 
-#import itertools
+import os
+import shutil
 import random
 import numpy as np
 
@@ -13,10 +14,27 @@ To do:
 1. perfect game notification
 '''
 
-#number of round each ANN plays
-max_rounds = 100
+#check whether there is data from a previous run
+if os.path.exists("./generations/stats.txt"):
+	usr_input = input("Data from a previous run seems to exist in ./generations/. Erase this folder? (Y/n)\n")
+	if usr_input == "Y":
+		print("Erasing data...")
+		shutil.rmtree("./generations")
+		print("Done.")
+	else:
+		print("Keeping data. Exiting.")
+		exit()
 
-#dimension of unit block
+#create folder for saving the generations
+os.mkdir("./generations")
+
+#number of rounds each ANN plays
+max_rounds = 20
+
+#maximal number of generations
+gen_max = 20
+
+#dimension of unit block in pixels
 snake_block = 10
 
 #offsets of playing field in pixels
@@ -29,21 +47,21 @@ field_height = 20
 
 def sigmoid(x):
 	return 1/(1+np.exp(-x))
-	
+
+# create version of sigmoid for vectors and matrices
+vsigmoid = np.vectorize(sigmoid)
+
 def mutate(matrix, rate):
 	for i in range(0,matrix.shape[0]):
 		for j in range(0,matrix.shape[1]):
 			matrix[i,j] += matrix[i,j] * np.random.normal(0, rate)
-
-# create version of sigmoid for vectors and matrices
-vsigmoid = np.vectorize(sigmoid)
 
 #stores the best weight matrices of the last generation along with their total scores
 #initially it stores dummy scores of -1
 #data will be stored in the format [total_score, W1, W2, W3]
 best_list_data = [[-1]]*100
 	
-for gen in range(1,41):
+for gen in range(1,gen_max):
 	#just stores the 100 best total scores of this generation
 	best_list = [-1]*100
 
@@ -60,18 +78,18 @@ for gen in range(1,41):
 				#one input layer with 9 neurons
 				#two hidden layers with 8 neurons each
 				#one output layer with 4 neurons
-				W1 = np.random.uniform(-1, 1, (8,9))
-				W2 = np.random.uniform(-1, 1, (8,8))
-				W3 = np.random.uniform(-1, 1, (4,8))
-				#W1 = np.load("25outof100.npz")['W1']
-				#W2 = np.load("25outof100.npz")['W2']
+				#last column of each weight matrix is for the bias
+				W1 = np.random.uniform(-1, 1, (8,10))
+				W2 = np.random.uniform(-1, 1, (8,9))
+				W3 = np.random.uniform(-1, 1, (4,9))
+
 			else:				
 				W1 = best_list_data[ann_cnt][1]
-				mutate(W1, 0.001)
+				mutate(W1, 0.005)
 				W2 = best_list_data[ann_cnt][2]
-				mutate(W2, 0.001)
+				mutate(W2, 0.005)
 				W3 = best_list_data[ann_cnt][3]
-				mutate(W3, 0.001)
+				mutate(W3, 0.005)
 			
 			total_score = 0
 
@@ -104,13 +122,42 @@ for gen in range(1,41):
 				#foody = random.randrange(field_height) * snake_block + offset_y
 				timeout = 0
 				while not game_over:
-					#set input vector for ANN, snake_List[0] contains coordinates of tail
-					inputvector = np.array([x1, y1, snake_List[0][0], snake_List[0][1], Length_of_snake, x1_change, y1_change, foodx, foody]).reshape(9,1)
+					#set input vector for ANN
+					#(x1,y1) = coords of head
+					#(snake_List[0][0], snake_List[0][1]) = coords of head
+					#Length_of_snake = well...
+					#(x1_change, y1_change) = direction of movement
+					#(foodx, foody) = coords of food
+		
+                    #first we normalize the inputvector
+					head_x_normalized = 2/field_width * (x1-offset_x)/snake_block - 1
+					head_y_normalized = 2/field_height * (y1-offset_y)/snake_block - 1
+					tail_x_normalized = 2/field_width * (snake_List[0][0]-offset_x)/snake_block - 1
+					tail_y_normalized = 2/field_height * (snake_List[0][1]-offset_y)/snake_block - 1
+					Los_normalized = Length_of_snake / (field_width*field_height)
+					x1_change_normalized = x1_change/snake_block
+					y1_change_normalized = y1_change/snake_block
+					food_x_normalized = 2/field_width * (foodx-offset_x)/snake_block - 1
+					food_y_normalized = 2/field_height * (foody-offset_y)/snake_block - 1
+        
+					inputvector = np.array([head_x_normalized, head_y_normalized, tail_x_normalized, tail_y_normalized, Los_normalized, x1_change_normalized, y1_change_normalized, food_x_normalized, food_y_normalized, 1]).reshape(10,1)
 					#print("input = " + str(inputvector))
 					
-					layer1 = np.tanh(np.matmul(W1, inputvector))
-					layer2 = np.tanh(np.matmul(W2, layer1))
-					outputvector = vsigmoid(np.matmul(W3, layer2))
+					#apply activation function to each entry
+					layer1_output = np.tanh(np.matmul(W1, inputvector))
+					
+					#append a one to the vector for the bias
+					layer1_output = np.append(layer1_output, 1)
+					layer1_output = layer1_output.reshape(9,1)
+					
+					#apply activation function to each entry
+					layer2_output = np.tanh(np.matmul(W2, layer1_output))
+					
+					#append a one to the vector for the bias
+					layer2_output = np.append(layer2_output, 1)
+					layer2_output = layer2_output.reshape(9,1)
+					
+					outputvector = vsigmoid(np.matmul(W3, layer2_output))
 				 	
 				 	#rescale outputvector to get probabilities
 					total_sum = outputvector[0] + outputvector[1] + outputvector[2] + outputvector[3]
@@ -218,8 +265,10 @@ for gen in range(1,41):
 	best_list_data = tmp_best_list_data
 
 	#save the best 100 weight matrices
+	#first create folder for the generation
+	os.mkdir("./generations/Gen_" + str(gen))
 	for j in range(len(tmp_best_list_data)):
-		np.savez("./best/Gen_" + str(gen) + "/" + str(best_list_data[j][4]) + "_" + str(best_list_data[j][0]), W1=best_list_data[j][1], W2=best_list_data[j][2], W3=best_list_data[j][3])
-	f = open("./best/stats.txt", "a")
+		np.savez("./generations/Gen_" + str(gen) + "/" + str(best_list_data[j][4]) + "_" + str(best_list_data[j][0]), W1=best_list_data[j][1], W2=best_list_data[j][2], W3=best_list_data[j][3])
+	f = open("./generations/stats.txt", "a")
 	f.write("Generation = " + str("{:03d}".format(gen)) + "\tMin = " + str("{:02d}".format(best_list[0])) + "\tMedian = " + str("{:02d}".format(best_list[50])) + "\tMax = " + str("{:02d}".format(best_list[99])) + "\n")
 	f.close()

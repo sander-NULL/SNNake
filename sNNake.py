@@ -84,11 +84,12 @@ def game():
  
     #create weight matrices
     #one input layer with 9 neurons
-    #one hidden layer with 10 neurons
+    #two hidden layers with 8 neurons
     #one output layer with 4 neurons
-    '''W1 = np.random.uniform(-0.01, 0.01, (10,9))
-    W2 = np.random.uniform(-1, 1, (4,10))'''
-    npzfile = np.load("588-6-3-8-2_45.npz")
+    '''W1 = np.random.uniform(-1, 1, (8,9))
+    W2 = np.random.uniform(-1, 1, (8,8))
+    W3 = np.random.uniform(-1, 1, (4,8))'''
+    npzfile = np.load("test.npz")
     W1 = npzfile['W1']
     W2 = npzfile['W2']
     W3 = npzfile['W3']
@@ -137,18 +138,48 @@ def game():
                     if event.key == pygame.K_c:
                         game()
  	
-        #set input vector for ANN, snake_List[0] contains coordinates of tail
-        inputvector = np.array([x1, y1, snake_List[0][0], snake_List[0][1], Length_of_snake, x1_change, y1_change, foodx, foody]).reshape(9,1)
-        print("input = " + str(inputvector))
+        #set input vector for ANN
+		#(x1,y1) = coords of head
+		#(snake_List[0][0], snake_List[0][1]) = coords of head
+		#Length_of_snake = well...
+		#(x1_change, y1_change) = direction of movement
+		#(foodx, foody) = coords of food
+		
+		#first we normalize the inputvector
+        head_x_normalized = 2/field_width * (x1-offset_x)/snake_block - 1
+        head_y_normalized = 2/field_height * (y1-offset_y)/snake_block - 1
+        tail_x_normalized = 2/field_width * (snake_List[0][0]-offset_x)/snake_block - 1
+        tail_y_normalized = 2/field_height * (snake_List[0][1]-offset_y)/snake_block - 1
+        Los_normalized = Length_of_snake / (field_width*field_height)
+        x1_change_normalized = x1_change/snake_block
+        y1_change_normalized = y1_change/snake_block
+        food_x_normalized = 2/field_width * (foodx-offset_x)/snake_block - 1
+        food_y_normalized = 2/field_height * (foody-offset_y)/snake_block - 1
         
-        layer1 = np.tanh(np.matmul(W1, inputvector))
-        layer2 = np.tanh(np.matmul(W2, layer1))        
-        outputvector = vsigmoid(np.matmul(W3, layer2))
+        inputvector = np.array([head_x_normalized, head_y_normalized, tail_x_normalized, tail_y_normalized, Los_normalized, x1_change_normalized, y1_change_normalized, food_x_normalized, food_y_normalized, 1]).reshape(10,1)
+		#print("input = " + str(inputvector))
+					
+		#apply activation function to each entry
+        layer1_output = np.tanh(np.matmul(W1, inputvector))
+					
+		#append a one to the vector for the bias
+        layer1_output = np.append(layer1_output, 1)
+        layer1_output = layer1_output.reshape(9,1)
+					
+		#apply activation function to each entry
+        layer2_output = np.tanh(np.matmul(W2, layer1_output))
+					
+		#append a one to the vector for the bias
+        layer2_output = np.append(layer2_output, 1)
+        layer2_output = layer2_output.reshape(9,1)
+					
+        outputvector = vsigmoid(np.matmul(W3, layer2_output))
  	
- 	#rescale outputvector to get probabilities
+ 		#rescale outputvector to get probabilities
         total_sum = outputvector[0] + outputvector[1] + outputvector[2] + outputvector[3]
         outputvector = 1/total_sum * outputvector
-        print("output = " + str(outputvector))
+        print("output = ")
+        print(outputvector)
         
         #see what index contains maximal value
         key = np.argmax(outputvector)
