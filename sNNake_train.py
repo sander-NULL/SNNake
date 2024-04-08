@@ -17,10 +17,10 @@ To do:
 POP_SIZE = 1000
 
 #amount of individuals that get to reproduce
-BEST_SIZE = 100
+BEST_SIZE = 200
 
 #amount of individuals each ANN can create as offspring
-OFFSPRING_SIZE = 9
+OFFSPRING_SIZE = 3
 
 #generation 1 is created randomly
 #from generation 2 onwards, the generation consists of:    a) the BEST_SIZE best from the previous generation
@@ -35,7 +35,7 @@ MAX_ROUNDS = 20
 MAX_GENS = 40
 
 #the mutation rate controls how big the alteration of the weight matrices is
-MUT_RATE = 0.001
+MUT_RATE = 0.1
 
 #check whether there is data from a previous run
 if os.path.exists("./generations"):
@@ -84,7 +84,7 @@ def mutate(matrix, rate):
         for j in range(0,matrix.shape[1]):
             matrix[i,j] += matrix[i,j] * np.random.normal(0, rate)
             
-def get_score_moves(W1, W2, W3):
+def get_fitness(W1, W2, W3):
     game_over = False
 
     #set starting position and speed
@@ -111,6 +111,7 @@ def get_score_moves(W1, W2, W3):
         foodx = offset_x + (i % field_width) * snake_block
         foody = offset_y + (i // field_width) * snake_block
 
+    initial_distance = abs(x1 - foodx) + abs(y1 - foody)
     moves = 0
     timeout = 0
     while not game_over:
@@ -220,6 +221,7 @@ def get_score_moves(W1, W2, W3):
                         i += 1
                 foodx = offset_x + (i % field_width) * snake_block
                 foody = offset_y + (i // field_width) * snake_block
+                initial_distance = abs(x1 - foodx) + abs(y1 - foody)
 
             length_of_snake += 1
             timeout = 0
@@ -229,7 +231,7 @@ def get_score_moves(W1, W2, W3):
             #ANN made 100 moves without finding food
             game_over = True
 
-    return [length_of_snake-1, moves]    
+    return length_of_snake-1 + (abs(x1 - foodx) + abs(y1 - foody))/initial_distance   
 
 #stores the best weight matrices of the last generation along with their total scores
 #initially it stores dummy scores of -1
@@ -283,8 +285,8 @@ for gen in range(1,MAX_GENS+1):
 
         for game_round in range(0, MAX_ROUNDS):
             #Let the ANN play MAX_ROUNDS rounds
-            pair = get_score_moves(W1, W2, W3)
-            fitness += pair[0]
+            fitness += get_fitness(W1, W2, W3)
+        fitness /= MAX_ROUNDS
         
         fitness /= MAX_ROUNDS
 
@@ -300,8 +302,7 @@ for gen in range(1,MAX_GENS+1):
             best_list[0] = fitness
             #sort the list again
             best_list.sort()
-            print("New best list: Min = " + str("{:7.5f}".format(best_list[0])) + "\tMedian = " + str("{:7.5f}".format(best_list[int(BEST_SIZE/2)])) + "\tMax = " + str("{:7.5f}".format(best_list[BEST_SIZE-1])))
-        print("Generation " + str(gen) + " ANN # " + str(cnt))
+        print("Generation " + str(gen) + "/" + str(MAX_GENS) + " ANN #" + str(cnt) + " | Min = " + str("{:7.5f}".format(best_list[0])) + " Median = " + str("{:7.5f}".format(best_list[int(BEST_SIZE/2)])) + " Max = " + str("{:7.5f}".format(best_list[BEST_SIZE-1])), end='\r')
         cnt+=1
 
     best_list_data = tmp_best_list_data
