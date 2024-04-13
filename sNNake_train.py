@@ -19,7 +19,7 @@ POP_SIZE = 1000
 #amount of individuals that get to reproduce
 BEST_SIZE = 200
 
-#amount of individuals each ANN can create as offspring
+#amount of individuals each NN can create as offspring
 OFFSPRING_SIZE = 3
 
 #generation 1 is created randomly
@@ -28,7 +28,7 @@ OFFSPRING_SIZE = 3
 #                                                          c) randomly generated individuals
 #note that we must have (OFFSPRING_SIZE + 1) * BEST_SIZE <= POP_SIZE
 
-#number of rounds each ANN plays
+#number of rounds each NN plays
 MAX_ROUNDS = 20
 
 #maximal number of generations
@@ -36,6 +36,10 @@ MAX_GENS = 40
 
 #the mutation rate controls how big the alteration of the weight matrices is
 MUT_RATE = 0.001
+
+#dimensions of playing field in blocks
+FIELD_WIDTH = 20
+FIELD_HEIGHT = 20
 
 #check whether there is data from a previous run
 if os.path.exists("./generations"):
@@ -48,7 +52,7 @@ if os.path.exists("./generations"):
         print("Keeping data. Exiting.")
         exit()
 
-#create folder for saving the generations
+#create folder for saving data
 os.mkdir("./generations")
 
 f = open("./generations/stats.txt", "a")
@@ -59,18 +63,6 @@ f.write("MAX_ROUNDS = " + str(MAX_ROUNDS) + "\n")
 f.write("MAX_GENS = " + str(MAX_GENS) + "\n")
 f.write("MUT_RATE = " + str(MUT_RATE) + "\n\n")
 f.close()
-
-
-#dimension of unit block in pixels
-snake_block = 10
-
-#offsets of playing field in pixels
-offset_x = 20
-offset_y = 35
-
-#dimensions of playing field in blocks
-field_width = 20
-field_height = 20
 
 def sigmoid(x):
     return 1/(1+np.exp(-x))
@@ -87,58 +79,56 @@ def mutate(matrix, rate):
 def get_fitness(W1, W2, W3):
     fitness = 0
     for game_round in range(0, MAX_ROUNDS):
-        #Let the ANN play MAX_ROUNDS rounds
+        #Let the NN play MAX_ROUNDS rounds
         game_over = False
-        #set starting position and speed
-        x1 = random.randrange(field_width) * snake_block + offset_x
-        y1 = random.randrange(field_height) * snake_block + offset_y
-        snake_Head = [x1, y1]
-        x1_change = 0
-        y1_change = 0
-        usr_x1_change = 0
-        usr_y1_change = 0
+        #set starting position
+        head_x = random.randrange(FIELD_WIDTH)
+        head_y = random.randrange(FIELD_HEIGHT)
+        snake_head = [head_x, head_y]
+        head_x_change = 0
+        head_y_change = 0
 
-        snake_List = [snake_Head]
+        snake_List = [snake_head]
         length_of_snake = 1
 
         #create random block for first food position and map it onto field blocks without snake blocks (which is just the head)
         #the following code enumerates <food_block> blocks excluding the ones belonging to the snake
         #starting from the top left corner
-        food_block = random.randrange(field_width * field_height - length_of_snake) + 1
+        food_block = random.randrange(FIELD_WIDTH * FIELD_HEIGHT - length_of_snake) + 1
         i = -1
         for j in range(food_block):
             i += 1
-            while [offset_x + (i % field_width) * snake_block, offset_y + (i // field_width) * snake_block] in snake_List:
+            while [i % FIELD_WIDTH, i // FIELD_WIDTH] in snake_List:
                 i += 1
-            foodx = offset_x + (i % field_width) * snake_block
-            foody = offset_y + (i // field_width) * snake_block
-    
-        moves = 0
+            food_x = i % FIELD_WIDTH
+            food_y = i // FIELD_WIDTH
+        
+        initial_distance = abs(head_x - food_x) + abs(head_y - food_y)
         timeout = 0
         while not game_over:
-            #set input vector for ANN
-            #(x1,y1) = coords of head
+            #set input vector for NN
+            #(head_x,head_y) = coords of head
             #(snake_List[0][0], snake_List[0][1]) = coords of head
             #length_of_snake = well...
-            #(x1_change, y1_change) = direction of movement
-            #(foodx, foody) = coords of food
+            #(head_x_change, head_y_change) = direction of movement
+            #(food_x, food_y) = coords of food
     
             #first we normalize the inputvector
             #all points (x,y) are mapped in the square [-1, 1) x (-1, 1]
             #the asymmetry in the half open intervals is due to pyGame's coordinate system having the origin in the top left corner
-            head_x_normalized = 2/field_width * (x1-offset_x)/snake_block - 1   #maps is to the range [-1, 1)
-            head_y_normalized = 1 - 2/field_height * (y1-offset_y)/snake_block  #maps it to the range (-1, 1]
-            tail_x_normalized = 2/field_width * (snake_List[0][0]-offset_x)/snake_block - 1     #maps is to the range [-1, 1)
-            tail_y_normalized = 1 - 2/field_height * (snake_List[0][1]-offset_y)/snake_block    #maps it to the range (-1, 1]
-            los_normalized = length_of_snake / (field_width*field_height)
-            x1_change_normalized = x1_change/snake_block
-            y1_change_normalized = y1_change/snake_block
-            food_x_normalized = 2/field_width * (foodx-offset_x)/snake_block - 1    #maps is to the range [-1, 1)
-            food_y_normalized = 1 - 2/field_height * (foody-offset_y)/snake_block   #maps it to the range (-1, 1]
+            head_x_normalized = 2/FIELD_WIDTH * head_x - 1   #maps is to the range [-1, 1)
+            head_y_normalized = 1 - 2/FIELD_HEIGHT * head_y  #maps it to the range (-1, 1]
+            tail_x_normalized = 2/FIELD_WIDTH * snake_List[0][0] - 1     #maps is to the range [-1, 1)
+            tail_y_normalized = 1 - 2/FIELD_HEIGHT * snake_List[0][1]    #maps it to the range (-1, 1]
+            los_normalized = length_of_snake #/ (FIELD_WIDTH*FIELD_HEIGHT)
+            head_x_change_normalized = head_x_change
+            head_y_change_normalized = head_y_change
+            food_x_normalized = 2/FIELD_WIDTH * food_x - 1   #maps is to the range [-1, 1)
+            food_y_normalized = 1 - 2/FIELD_HEIGHT * food_y  #maps it to the range (-1, 1]
     
-            inputvector = np.array([head_x_normalized, head_y_normalized, tail_x_normalized, tail_y_normalized, los_normalized, x1_change_normalized, y1_change_normalized, food_x_normalized, food_y_normalized, 1]).reshape(10,1)
+            inputvector = np.array([head_x_normalized, head_y_normalized, tail_x_normalized, tail_y_normalized, los_normalized, head_x_change_normalized, head_y_change_normalized, food_x_normalized, food_y_normalized, 1]).reshape(10,1)
     
-            #apply activation function to each entry
+            #multiply W1 with inputvector and apply activation function to each entry
             layer1_output = np.tanh(np.matmul(W1, inputvector))
     
             #append a one to the vector for the bias
@@ -158,55 +148,51 @@ def get_fitness(W1, W2, W3):
             total_sum = outputvector[0] + outputvector[1] + outputvector[2] + outputvector[3]
             outputvector = 1/total_sum * outputvector
     
-            #see what index contains maximal value
+            #check at what index maximal value is contained
             key = np.argmax(outputvector)
             if (key == 0):
                 #move left
-                if (x1_change == 0):
-                    usr_x1_change = -snake_block
-                    usr_y1_change = 0
+                if (head_x_change == 0):
+                    head_x_change = -1
+                    head_y_change = 0
             elif (key == 1):
                 #move up
-                if (y1_change == 0):
-                    usr_y1_change = -snake_block
-                    usr_x1_change = 0
+                if (head_y_change == 0):
+                    head_y_change = -1
+                    head_x_change = 0
             elif (key == 2):
                 #move right
-                if (x1_change == 0):
-                    usr_x1_change = snake_block
-                    usr_y1_change = 0
+                if (head_x_change == 0):
+                    head_x_change = 1
+                    head_y_change = 0
             elif (key == 3):
                 #move down
-                if (y1_change == 0):
-                    usr_y1_change = snake_block
-                    usr_x1_change = 0
+                if (head_y_change == 0):
+                    head_y_change = 1
+                    head_x_change = 0
     
             #change snake coordinates
-            #change x1_change and y1_change only once per tick to prevent snake from instantly moving in opposite direction and hitting itself
-            x1_change = usr_x1_change
-            y1_change = usr_y1_change    
-            x1 += x1_change
-            y1 += y1_change
+            head_x += head_x_change
+            head_y += head_y_change
     
             #check whether snake hits border
-            if x1 >= offset_x + field_width * snake_block or x1 < offset_x \
-            or y1 >= offset_y + field_height * snake_block or y1 < offset_y:
+            if head_x >= FIELD_WIDTH  or head_x < 0 \
+            or head_y >= FIELD_HEIGHT or head_y < 0:
                 game_over = True
     
-            snake_Head = [x1, y1]
-            snake_List.append(snake_Head)
+            snake_head = [head_x, head_y]
+            snake_List.append(snake_head)
             if len(snake_List) > length_of_snake:
                 del snake_List[0]
     
             for x in snake_List[:-1]:
-                if x == snake_Head:
+                if x == snake_head:
                     game_over = True
     
-            moves += 1
             timeout += 1
             #check whether snake ate food
-            if (x1 == foodx) and (y1 == foody):
-                if field_width * field_height - length_of_snake == 0:
+            if (head_x == food_x) and (head_y == food_y):
+                if FIELD_WIDTH * FIELD_HEIGHT - length_of_snake == 0:
                     #perfect game
                     print("Perfect Game!")
                     game_over = True
@@ -214,31 +200,33 @@ def get_fitness(W1, W2, W3):
                     #create random block for new food position and map it onto field blocks without snake blocks
                     #the following code enumerates <food_block> blocks excluding the ones belonging to the snake
                     #starting from the top left corner
-                    food_block = random.randrange(field_width * field_height - length_of_snake) + 1
+                    food_block = random.randrange(FIELD_WIDTH * FIELD_HEIGHT - length_of_snake) + 1
                     i = -1
                     for j in range(food_block):
                         i += 1
-                        while [offset_x + (i % field_width) * snake_block, offset_y + (i // field_width) * snake_block] in snake_List:
+                        while [i % FIELD_WIDTH, i // FIELD_WIDTH] in snake_List:
                             i += 1
-                    foodx = offset_x + (i % field_width) * snake_block
-                    foody = offset_y + (i // field_width) * snake_block
+                    food_x = i % FIELD_WIDTH
+                    food_y = i // FIELD_WIDTH
+                    initial_distance = abs(head_x - food_x) + abs(head_y - food_y)
     
                 length_of_snake += 1
                 timeout = 0
     
-            #to prevent the ANN from running in circles we implement a timeout
+            #to prevent the NN from running in circles we implement a timeout
             if timeout == 100:
-                #ANN made 100 moves without finding food
+                #NN made 100 moves without finding food
                 game_over = True
-   
-        fitness+=length_of_snake-1
-    
-    fitness/=MAX_ROUNDS  
-    #distance = abs(x1 - foodx) + abs(y1 - foody)
-    #if distance > initial_distance:
-    #    return length_of_snake-1 - distance/40
-    #else:
-    #    return length_of_snake-1 + distance/initial_distance   
+            
+            distance = abs(head_x - food_x) + abs(head_y - food_y)
+        
+        if distance < initial_distance:
+            fitness+=length_of_snake - 1 + distance/(FIELD_HEIGHT + FIELD_WIDTH)
+        elif distance > initial_distance:
+            fitness+=length_of_snake - 1 - distance/(FIELD_HEIGHT + FIELD_WIDTH)
+        else:
+            fitness+=length_of_snake - 1
+    fitness/=MAX_ROUNDS    
     return fitness
 
 #stores the best weight matrices of the last generation along with their total scores
@@ -294,7 +282,7 @@ for gen in range(1,MAX_GENS+1):
                 
         fitness = get_fitness(W1, W2, W3)
         if fitness > best_list[0]:
-            #ANN is under the BEST_SIZE best so far
+            #NN is under the BEST_SIZE best so far
             #replace the worst with the current one	
             for j in range(len(tmp_best_list_data)):
                 if tmp_best_list_data[j][0] == best_list[0]:
@@ -305,7 +293,7 @@ for gen in range(1,MAX_GENS+1):
             best_list[0] = fitness
             #sort the list again
             best_list.sort()
-        print("Generation " + gen_fstr.format(gen) + "/" + str(MAX_GENS) + " ANN #" + nncnt_fstr.format(cnt) + " | Min = " + "{:+7.5f}".format(best_list[0]) + " Median = " + "{:+7.5f}".format(best_list[int(BEST_SIZE/2)]) + " Max = " + "{:+7.5f}".format(best_list[BEST_SIZE-1]), end='\r')
+        print("Generation " + gen_fstr.format(gen) + "/" + str(MAX_GENS) + " NN #" + nncnt_fstr.format(cnt) + " | Min = " + "{:+7.5f}".format(best_list[0]) + " Median = " + "{:+7.5f}".format(best_list[int(BEST_SIZE/2)]) + " Max = " + "{:+7.5f}".format(best_list[BEST_SIZE-1]), end='\r')
         cnt+=1
     
     print()
