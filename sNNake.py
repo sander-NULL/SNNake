@@ -12,7 +12,6 @@ import numpy as np
 '''
 To do:
 1. perfect game notification
-2. order of drawing stuff
 '''
 
 pygame.init()
@@ -36,12 +35,12 @@ offset_x = 20
 offset_y = 35
 
 #dimensions of playing field in blocks
-field_width = 20
-field_height = 20
+FIELD_WIDTH = 20
+FIELD_HEIGHT = 20
 
 #dimensions of display
-dis_width = field_width * snake_block + 4 + 2 * offset_x + 400
-dis_height = field_height * snake_block + 4 + offset_y + 10
+dis_width = FIELD_WIDTH * snake_block + 4 + 2 * offset_x + 400
+dis_height = FIELD_HEIGHT * snake_block + 4 + offset_y + 10
  
 dis = pygame.display.set_mode((dis_width, dis_height))
 pygame.display.set_caption('SNNake')
@@ -95,72 +94,70 @@ def game():
     W3 = npzfile['W3']
     
     # set starting position and speed
-    x1 = random.randrange(field_width) * snake_block + offset_x
-    y1 = random.randrange(field_height) * snake_block + offset_y
+    head_x = random.randrange(FIELD_WIDTH) * snake_block + offset_x
+    head_y = random.randrange(FIELD_HEIGHT) * snake_block + offset_y
     
-    snake_Head = [x1, y1]
-    x1_change = 0
-    y1_change = 0
-    usr_x1_change = 0
-    usr_y1_change = 0
+    snake_Head = [head_x, head_y]
+    head_x_change = 0
+    head_y_change = 0
  
-    snake_List = [snake_Head]
-    Length_of_snake = 1
+    snake_list = [snake_Head]
+    snake_length = 1
  
     # create random block for first food position and map it onto field blocks without snake blocks (which is just the head)
     # the following code enumerates <food_block> blocks excluding the ones belonging to the snake
     # starting from the top left corner
-    food_block = random.randrange(field_width * field_height - Length_of_snake) + 1
+    food_block = random.randrange(FIELD_WIDTH * FIELD_HEIGHT - snake_length) + 1
     i = -1
     for j in range(food_block):
         i += 1
-        while [offset_x + (i % field_width) * snake_block, offset_y + (i // field_width) * snake_block] in snake_List:
+        while [offset_x + (i % FIELD_WIDTH) * snake_block, offset_y + (i // FIELD_WIDTH) * snake_block] in snake_list:
             i += 1
-        foodx = offset_x + (i % field_width) * snake_block
-        foody = offset_y + (i // field_width) * snake_block
+        food_x = offset_x + (i % FIELD_WIDTH) * snake_block
+        food_y = offset_y + (i // FIELD_WIDTH) * snake_block
         
     while not game_close:
         #snake hits border check
-        if x1 >= offset_x + field_width * snake_block or x1 < offset_x \
-        or y1 >= offset_y + field_height * snake_block or y1 < offset_y:
+        if head_x >= offset_x + FIELD_WIDTH * snake_block or head_x < offset_x \
+        or head_y >= offset_y + FIELD_HEIGHT * snake_block or head_y < offset_y:
             game_over = True
         
-        snake_Head = [x1, y1]
-        snake_List.append(snake_Head)
-        if len(snake_List) > Length_of_snake:
-            del snake_List[0]
+        snake_Head = [head_x, head_y]
+        snake_list.append(snake_Head)
+        if len(snake_list) > snake_length:
+            del snake_list[0]
  
-        for x in snake_List[:-1]:
+        for x in snake_list[:-1]:
             if x == snake_Head:
                 game_over = True
         
         #check if snake ate food
-        if x1 == foodx and y1 == foody:
-            if field_width * field_height == Length_of_snake:
+        if head_x == food_x and head_y == food_y:
+            if FIELD_WIDTH * FIELD_HEIGHT == snake_length:
                 #Perfect game?
                 game_over = True
             else:
                 #create random block for new food position and map it onto field blocks without snake blocks
                 #the following code enumerates <food_block> blocks excluding the ones belonging to the snake
                 #starting from the top left corner
-                food_block = random.randrange(field_width * field_height - Length_of_snake) + 1
+                food_block = random.randrange(FIELD_WIDTH * FIELD_HEIGHT - snake_length) + 1
                 i = -1
                 for j in range(food_block):
                     i += 1
-                    while [offset_x + (i % field_width) * snake_block, offset_y + (i // field_width) * snake_block] in snake_List:
+                    while [offset_x + (i % FIELD_WIDTH) * snake_block, offset_y + (i // FIELD_WIDTH) * snake_block] in snake_list:
                         i += 1
-                foodx = offset_x + (i % field_width) * snake_block
-                foody = offset_y + (i // field_width) * snake_block
-            Length_of_snake += 1
+                food_x = offset_x + (i % FIELD_WIDTH) * snake_block
+                food_y = offset_y + (i // FIELD_WIDTH) * snake_block
+            snake_length += 1
                  
         #draw background, border and food
         dis.fill(black)
-        pygame.draw.rect(dis, white, [offset_x-3, offset_y-3, field_width * snake_block + 5, field_height * snake_block + 5] , 2)
-        pygame.draw.rect(dis, green, [foodx, foody, snake_block-1, snake_block-1])
+        pygame.draw.rect(dis, white, [offset_x-3, offset_y-3, FIELD_WIDTH * snake_block + 5, FIELD_HEIGHT * snake_block + 5] , 2)
+        pygame.draw.rect(dis, green, [food_x, food_y, snake_block-1, snake_block-1])
  
         #draw snake and score
-        draw_snake(snake_block, snake_List)
-        draw_score(Length_of_snake - 1)
+        draw_snake(snake_block, snake_list)
+        draw_score(snake_length - 1)
  
         #update screen
         pygame.display.update()
@@ -178,27 +175,26 @@ def game():
                         game()
 
         #set input vector for ANN
-        #(x1,y1) = coords of head
-        #(snake_List[0][0], snake_List[0][1]) = coords of head
-        #Length_of_snake = well...
-        #(x1_change, y1_change) = direction of movement
-        #(foodx, foody) = coords of food
+        #(head_x,head_y) = coords of head
+        #(snake_list[0][0], snake_list[0][1]) = coords of head
+        #snake_length = well...
+        #(head_x_change, head_y_change) = direction of movement
+        #(food_x, food_y) = coords of food
 
         #first we normalize the inputvector
-        #all points (x,y) are mapped in the square [-1, 1) x (-1, 1]
+        #all 2d points (x,y) are mapped in the square [-1, 1) x (-1, 1]
         #the asymmetry in the half open intervals is due to pyGame's coordinate system having the origin in the top left corner
-        head_x_normalized = 2/field_width * (x1-offset_x)/snake_block - 1   #maps is to the range [-1, 1)
-        head_y_normalized = 1 - 2/field_height * (y1-offset_y)/snake_block  #maps it to the range (-1, 1]
-        tail_x_normalized = 2/field_width * (snake_List[0][0]-offset_x)/snake_block - 1     #maps is to the range [-1, 1)
-        tail_y_normalized = 1 - 2/field_height * (snake_List[0][1]-offset_y)/snake_block    #maps it to the range (-1, 1]
-        Los_normalized = Length_of_snake / (field_width*field_height)
-        x1_change_normalized = x1_change/snake_block
-        y1_change_normalized = y1_change/snake_block
-        food_x_normalized = 2/field_width * (foodx-offset_x)/snake_block - 1    #maps is to the range [-1, 1)
-        food_y_normalized = 1 - 2/field_height * (foody-offset_y)/snake_block   #maps it to the range (-1, 1]
+        head_x_n = 2/FIELD_WIDTH * (head_x-offset_x)/snake_block - 1   #maps is to the range [-1, 1)
+        head_y_n = 1 - 2/FIELD_HEIGHT * (head_y-offset_y)/snake_block  #maps it to the range (-1, 1]
+        tail_x_n = 2/FIELD_WIDTH * (snake_list[0][0]-offset_x)/snake_block - 1     #maps is to the range [-1, 1)
+        tail_y_n = 1 - 2/FIELD_HEIGHT * (snake_list[0][1]-offset_y)/snake_block    #maps it to the range (-1, 1]
+        snake_length_n = snake_length / (FIELD_WIDTH * FIELD_HEIGHT)
+        head_x_change_n = head_x_change/snake_block
+        head_y_change_n = head_y_change/snake_block
+        food_x_n = 2/FIELD_WIDTH * (food_x-offset_x)/snake_block - 1    #maps is to the range [-1, 1)
+        food_y_n = 1 - 2/FIELD_HEIGHT * (food_y-offset_y)/snake_block   #maps it to the range (-1, 1]
         
-        inputvector = np.array([head_x_normalized, head_y_normalized, tail_x_normalized, tail_y_normalized, Los_normalized, x1_change_normalized, y1_change_normalized, food_x_normalized, food_y_normalized, 1]).reshape(10,1)
-        print("x1="+str(x1)+" y1="+str(y1))
+        inputvector = np.array([head_x_n, head_y_n, tail_x_n, tail_y_n, snake_length_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n, 1]).reshape(10,1)
         print("input = ")
         print(inputvector)
 
@@ -229,31 +225,31 @@ def game():
         if (key == 0):
             #move left
             print('LEFT')
-            if (x1_change == 0):
-                x1_change = -snake_block
-                y1_change = 0
+            if (head_x_change == 0):
+                head_x_change = -snake_block
+                head_y_change = 0
         elif (key == 1):
             #move up
             print('UP')
-            if (y1_change == 0):
-                y1_change = -snake_block
-                x1_change = 0
+            if (head_y_change == 0):
+                head_y_change = -snake_block
+                head_x_change = 0
         elif (key == 2):
             #move right
             print('RIGHT')
-            if (x1_change == 0):
-                x1_change = snake_block
-                y1_change = 0
+            if (head_x_change == 0):
+                head_x_change = snake_block
+                head_y_change = 0
         elif (key == 3):
             #move down
             print('DOWN')
-            if (y1_change == 0):
-                y1_change = snake_block
-                x1_change = 0
+            if (head_y_change == 0):
+                head_y_change = snake_block
+                head_x_change = 0
         
         #change snake coordinates   
-        x1 += x1_change
-        y1 += y1_change
+        head_x += head_x_change
+        head_y += head_y_change
         clock.tick(snake_speed)
     pygame.quit()
     quit()
