@@ -28,7 +28,7 @@ blue = (50, 153, 213)
 snake_block = 10
 
 #speed of the snake
-snake_speed = 1
+snake_speed = 5
 
 #offsets of playing field in pixels
 offset_x = 20
@@ -88,10 +88,14 @@ def game():
     '''W1 = np.random.uniform(-1, 1, (8,9))
     W2 = np.random.uniform(-1, 1, (8,8))
     W3 = np.random.uniform(-1, 1, (4,8))'''
-    npzfile = np.load("10_fit=0.02499999999999999.npz")
+    
+    npzfile = np.load("model_weights.npz")
     W1 = npzfile['W1']
+    b1 = npzfile['b1']
     W2 = npzfile['W2']
+    b2 = npzfile['b2']
     W3 = npzfile['W3']
+    b3 = npzfile['b3']
     
     # set starting position and speed
     head_x = random.randrange(FIELD_WIDTH) * snake_block + offset_x
@@ -109,7 +113,7 @@ def game():
     # starting from the top left corner
     food_block = random.randrange(FIELD_WIDTH * FIELD_HEIGHT - snake_length) + 1
     i = -1
-    for j in range(food_block):
+    for _ in range(food_block):
         i += 1
         while [offset_x + (i % FIELD_WIDTH) * snake_block, offset_y + (i // FIELD_WIDTH) * snake_block] in snake_list:
             i += 1
@@ -142,7 +146,7 @@ def game():
                 #starting from the top left corner
                 food_block = random.randrange(FIELD_WIDTH * FIELD_HEIGHT - snake_length) + 1
                 i = -1
-                for j in range(food_block):
+                for _ in range(food_block):
                     i += 1
                     while [offset_x + (i % FIELD_WIDTH) * snake_block, offset_y + (i // FIELD_WIDTH) * snake_block] in snake_list:
                         i += 1
@@ -194,25 +198,19 @@ def game():
         food_x_n = 2/FIELD_WIDTH * (food_x-offset_x)/snake_block - 1    #maps is to the range [-1, 1)
         food_y_n = 1 - 2/FIELD_HEIGHT * (food_y-offset_y)/snake_block   #maps it to the range (-1, 1]
         
-        inputvector = np.array([head_x_n, head_y_n, tail_x_n, tail_y_n, snake_length_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n, 1]).reshape(10,1)
+        #inputvector = np.array([head_x_n, head_y_n, tail_x_n, tail_y_n, snake_length_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n, 1]).reshape(10,1)
+        inputvector = np.array([head_x_n, head_y_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n])
         print("input = ")
         print(inputvector)
 
-        #apply activation function to each entry
-        layer1_output = np.tanh(np.matmul(W1, inputvector))
+        #compute output of first hidden layer
+        layer1_output = np.tanh(np.matmul(W1, inputvector) + b1)
 
-        #append a one to the vector for the bias
-        layer1_output = np.append(layer1_output, 1)
-        layer1_output = layer1_output.reshape(9,1)
+        #compute output of second hidden layer
+        layer2_output = np.tanh(np.matmul(W2, layer1_output) + b2)
 
-        #apply activation function to each entry
-        layer2_output = np.tanh(np.matmul(W2, layer1_output))
-
-        #append a one to the vector for the bias
-        layer2_output = np.append(layer2_output, 1)
-        layer2_output = layer2_output.reshape(9,1)
-
-        outputvector = vsigmoid(np.matmul(W3, layer2_output))
+        #compute output
+        outputvector = vsigmoid(np.matmul(W3, layer2_output) + b3)
 
         #rescale outputvector to get probabilities
         total_sum = outputvector[0] + outputvector[1] + outputvector[2] + outputvector[3]
