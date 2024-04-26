@@ -34,10 +34,19 @@ def write_data(path, start = 0, stepsize = 2):
                                     #snake is moving to the left
                                     if head_x < food_x:
                                         #need to make u-turn
-                                        if head_y < sc.FIELD_HEIGHT/2:
+                                        if head_y < food_y:
                                             key = "DOWN"
-                                        else:
+                                        elif head_y > food_y:
                                             key = "UP"
+                                        else:
+                                            #head and food have same y-coordinate
+                                            if head_y < sc.FIELD_HEIGHT/2:
+                                                #head is in upper half
+                                                key = "DOWN"
+                                            else:
+                                                #head is in lower half
+                                                key = "UP"
+                                            
                                     elif head_x > food_x:
                                         key = "LEFT"
                                     else:
@@ -53,10 +62,18 @@ def write_data(path, start = 0, stepsize = 2):
                                         key = "RIGHT"
                                     elif head_x > food_x:
                                         #need to make u-turn
-                                        if head_y < sc.FIELD_HEIGHT/2:
+                                        if head_y < food_y:
                                             key = "DOWN"
-                                        else:
+                                        elif head_y > food_y:
                                             key = "UP"
+                                        else:
+                                            #head and food have same y-coordinate
+                                            if head_y < sc.FIELD_HEIGHT/2:
+                                                #head is in upper half
+                                                key = "DOWN"
+                                            else:
+                                                #head is in lower half
+                                                key = "UP"
                                     else:
                                         if head_y < food_y:
                                             key = "DOWN"
@@ -73,10 +90,17 @@ def write_data(path, start = 0, stepsize = 2):
                                     else:
                                         if head_y < food_y:
                                             #need to make u-turn
-                                            if head_x < sc.FIELD_WIDTH/2:
+                                            if head_x < food_x:
                                                 key = "RIGHT"
-                                            else:
+                                            elif head_x > food_x:
                                                 key = "LEFT"
+                                            else:
+                                                #head and food have same x-coordinate
+                                                if head_x < sc.FIELD_WIDTH/2:
+                                                    #head is in left half
+                                                    key = "RIGHT"
+                                                else:
+                                                    key = "LEFT"
                                         else:
                                             #here food_x == head_x, hence food_y == head_y is impossible
                                             key = "UP"
@@ -91,12 +115,20 @@ def write_data(path, start = 0, stepsize = 2):
                                         if head_y < food_y:
                                             key = "DOWN"
                                         else:
-                                            #here food_x == head_x, hence food_y == head_y is impossible
+                                            #here food_x == head_x, hence head_y > food_y is impossible
                                             #need to make u-turn
-                                            if head_x < sc.FIELD_WIDTH/2:
+                                            if head_x < food_x:
                                                 key = "RIGHT"
+                                            elif head_x > food_x:
+                                                key = "LEFT"
                                             else:
-                                                key = "LEFT"                                                                               
+                                                #head and food have same x-coordinate
+                                                if head_x < sc.FIELD_WIDTH/2:
+                                                    #head is in left half
+                                                    key = "RIGHT"
+                                                else:
+                                                    key = "LEFT"
+                                                                                                                        
                                 writer.writerow([head_x, head_y, head_x_change, head_y_change, food_x, food_y, key])
     
 if os.path.exists("./tt_data"):

@@ -116,10 +116,10 @@ test_dataloader = DataLoader(test_set, batch_size=100, shuffle=True)
 model = NeuralNetwork()
 
 batch_size = 100
-epochs = 2
+epochs = 4
 
 loss_func = nn.MSELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = 0.8)
+optimizer = torch.optim.SGD(model.parameters(), lr = 0.5)
 
 for t in range(epochs):
     print(f"Epoch {t+1}\n---------------------------------")
