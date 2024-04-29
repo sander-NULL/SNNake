@@ -28,7 +28,7 @@ blue = (50, 153, 213)
 snake_block = 10
 
 #speed of the snake
-snake_speed = 5
+snake_speed = 10
 
 #offsets of playing field in pixels
 offset_x = 20
