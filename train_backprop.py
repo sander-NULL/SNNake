@@ -20,14 +20,14 @@ def translate(string):
         return torch.tensor([0,0,1.0,0])
     elif string == "DOWN":
         return torch.tensor([0,0,0,1.0])
-
+'''
 def normalize(inputvec):
     out = inputvec
     out[0] = 2/sc.FIELD_WIDTH * inputvec[0] - 1   #maps it to [-1, 1)
     out[1] = 1 - 2/sc.FIELD_HEIGHT * inputvec[1]  #maps it to (-1, 1]
     out[4] = 2/sc.FIELD_WIDTH * inputvec[4] - 1   #maps it to [-1, 1)
     out[5] = 1 - 2/sc.FIELD_HEIGHT * inputvec[5]  #maps it to (-1, 1]
-    return out
+    return out'''
 
 class CustomTrainSet(Dataset):
     def __init__(self, annotations_file, transform = None, target_transform = None):
@@ -106,8 +106,8 @@ def test_loop(dataloader, model, loss_func):
     print(f"Test Error:\nAccuracy: {(100*correct):>0.1f}%, Avg. loss: {test_loss:>8f}\n")
 
 torch.set_default_dtype(torch.float64)
-train_set = CustomTrainSet("./tt_data/train_annotations.csv", transform=normalize, target_transform=translate)
-test_set = CustomTrainSet("./tt_data/test_annotations.csv", transform=normalize, target_transform=translate)
+train_set = CustomTrainSet("./tt_data/train_annotations.csv", transform=sc.normalize, target_transform=translate)
+test_set = CustomTrainSet("./tt_data/test_annotations.csv", transform=sc.normalize, target_transform=translate)
 
 train_dataloader = DataLoader(train_set, batch_size=100, shuffle=True)
 test_dataloader = DataLoader(test_set, batch_size=100, shuffle=True)

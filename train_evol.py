@@ -13,6 +13,9 @@ import snake_core as sc
 '''
 To do:
 1. perfect game notification
+2. What if (OFFSPRING_SIZE + 1) * BEST_SIZE <= POP_SIZE does not hold?
+3. Best lists values initialization with -1 is bad
+4. while cnt to for cnt
 '''
 #size of each population
 POP_SIZE = 1000
@@ -24,9 +27,9 @@ BEST_SIZE = 200
 OFFSPRING_SIZE = 3
 
 #generation 1 is created randomly
-#from generation 2 onwards, the generation consists of:    a) the BEST_SIZE best from the previous generation
-#                                                          b) BEST_SIZE * OFFSPRING_SIZE slightly modified versions of a)
-#                                                          c) randomly generated individuals
+#from generation 2 onwards, the current generation consists of:    a) the BEST_SIZE best from the previous generation
+#                                                                  b) BEST_SIZE * OFFSPRING_SIZE slightly modified versions of a)
+#                                                                  c) randomly generated individuals
 #note that we must have (OFFSPRING_SIZE + 1) * BEST_SIZE <= POP_SIZE
 
 #number of rounds each NN plays
@@ -36,8 +39,8 @@ MAX_ROUNDS = 20
 MAX_GENS = 40
 
 #the mutation rate controls how big the alteration of the weight matrices is
-MUT_RATE = 0.001
-
+MUT_RATE = 0.01
+    
 #check whether there is data from a previous run
 if os.path.exists("./generations"):
     usr_input = input("Data from a previous run seems to exist in ./generations/. Erase this folder? (Y/n)\n")
@@ -52,28 +55,86 @@ if os.path.exists("./generations"):
 #create folder for saving data
 os.mkdir("./generations")
 
-f = open("./generations/stats.txt", "a")
-f.write("POP_SIZE = " + str(POP_SIZE) + "\n")
-f.write("BEST_SIZE = " + str(BEST_SIZE) + "\n")
-f.write("OFFSPRING_SIZE = " + str(OFFSPRING_SIZE) + "\n")
-f.write("MAX_ROUNDS = " + str(MAX_ROUNDS) + "\n")
-f.write("MAX_GENS = " + str(MAX_GENS) + "\n")
-f.write("MUT_RATE = " + str(MUT_RATE) + "\n\n")
-f.close()
+#DEBUG
+#os.mkdir("./generations/debug")
 
-def sigmoid(x):
-    return 1/(1+np.exp(-x))
+with open("./generations/stats.txt", "a") as f:
+    f.write(f"POP_SIZE = {POP_SIZE}\n")
+    f.write(f"BEST_SIZE = {BEST_SIZE}\n")
+    f.write(f"OFFSPRING_SIZE = {OFFSPRING_SIZE}\n")
+    f.write(f"MAX_ROUNDS = {MAX_ROUNDS}\n")
+    f.write(f"MAX_GENS = {MAX_GENS}\n")
+    f.write(f"MUT_RATE = {MUT_RATE}\n\n")
 
-#create version of sigmoid for vectors and matrices
-vsigmoid = np.vectorize(sigmoid)
+#alters the entries of an array
+def mutate(array, rate):
+    mutated = np.copy(array)
+    with np.nditer(mutated, op_flags=['readwrite']) as it:
+        for x in it:
+            x[...] += np.random.normal(0, rate)
+    return mutated
 
-#alters the entries of a matrix
-def mutate(matrix, rate):
-    for i in range(0,matrix.shape[0]):
-        for j in range(0,matrix.shape[1]):
-            matrix[i,j] += matrix[i,j] * np.random.normal(0, rate)
+def get_fitness2(W1, b1, W2, b2, W3, b3):
+    fitness = 0
+    for head_x in range(1, sc.FIELD_WIDTH - 1, 4):
+        for head_y in range(1, sc.FIELD_HEIGHT - 1, 5):
+            for shift_x in range(1, sc.FIELD_WIDTH - 2, 5):
+                food_x = 1 + (head_x - 1 + shift_x) % (sc.FIELD_WIDTH-2)
+                for shift_y in range(1, sc.FIELD_HEIGHT - 2, 5):
+                    food_y = 1 + (head_y - 1 + shift_y) % (sc.FIELD_HEIGHT-2)                    
+                    init_distance = abs(head_x - food_x) + abs(head_y - food_y)
+                    for head_x_change, head_y_change in ((0,0), (-1,0), (1,0), (0,-1), (0,1)):
             
-def get_fitness(W1, W2, W3):
+                        #inputvector = np.array([head_x_n, head_y_n, tail_x_n, tail_y_n, snake_length_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n, 1]).reshape(10,1)
+                        inputvector = sc.normalize(np.array([head_x, head_y, head_x_change, head_y_change, food_x, food_y]))
+                        
+                        #multiply W1 with inputvector and apply activation function to each entry
+                        layer1_output = np.tanh(np.matmul(W1, inputvector) + b1)
+                
+                        layer2_output = np.tanh(np.matmul(W2, layer1_output) + b2)
+                
+                        outputvector = sc.vsigmoid(np.matmul(W3, layer2_output) + b3)
+                
+                        #rescale outputvector to get probabilities
+                        total_sum = outputvector[0] + outputvector[1] + outputvector[2] + outputvector[3]
+                        outputvector = 1/total_sum * outputvector
+                        
+                        #check at what index maximal value is contained
+                        key = np.argmax(outputvector)
+                        if (key == 0):
+                            #move left
+                            if (head_x_change == 0):
+                                head_x_change = -1
+                                head_y_change = 0
+                        elif (key == 1):
+                            #move up
+                            if (head_y_change == 0):
+                                head_y_change = -1
+                                head_x_change = 0
+                        elif (key == 2):
+                            #move right
+                            if (head_x_change == 0):
+                                head_x_change = 1
+                                head_y_change = 0
+                        elif (key == 3):
+                            #move down
+                            if (head_y_change == 0):
+                                head_y_change = 1
+                                head_x_change = 0
+                
+                        #get new head coordinates
+                        new_head_x = head_x + head_x_change
+                        new_head_y = head_y + head_y_change
+                        
+                        distance = abs(new_head_x - food_x) + abs(new_head_y - food_y)
+                        if distance < init_distance:
+                            fitness += 0.001
+                        else:
+                            fitness -= 0.001
+    return fitness
+                    
+                
+def get_fitness(W1, b1, W2, b2, W3, b3):
     fitness = 0
     for _ in range(0, MAX_ROUNDS):
         #Let the NN play MAX_ROUNDS rounds
@@ -116,32 +177,23 @@ def get_fitness(W1, W2, W3):
             #the asymmetry in the half open intervals is due to pyGame's coordinate system having the origin in the top left corner
             head_x_n = 2/sc.FIELD_WIDTH * head_x - 1   #maps is to the range [-1, 1)
             head_y_n = 1 - 2/sc.FIELD_HEIGHT * head_y  #maps it to the range (-1, 1]
-            tail_x_n = 2/sc.FIELD_WIDTH * snake_list[0][0] - 1     #maps is to the range [-1, 1)
-            tail_y_n = 1 - 2/sc.FIELD_HEIGHT * snake_list[0][1]    #maps it to the range (-1, 1]
-            snake_length_n = snake_length / (sc.FIELD_WIDTH * sc.FIELD_HEIGHT)
+            #tail_x_n = 2/sc.FIELD_WIDTH * snake_list[0][0] - 1     #maps is to the range [-1, 1)
+            #tail_y_n = 1 - 2/sc.FIELD_HEIGHT * snake_list[0][1]    #maps it to the range (-1, 1]
+            #snake_length_n = snake_length / (sc.FIELD_WIDTH * sc.FIELD_HEIGHT)
             head_x_change_n = head_x_change
             head_y_change_n = head_y_change
             food_x_n = 2/sc.FIELD_WIDTH * food_x - 1   #maps is to the range [-1, 1)
             food_y_n = 1 - 2/sc.FIELD_HEIGHT * food_y  #maps it to the range (-1, 1]
     
             #inputvector = np.array([head_x_n, head_y_n, tail_x_n, tail_y_n, snake_length_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n, 1]).reshape(10,1)
-            inputvector = np.array([head_x_n, head_y_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n, 1]).reshape(7,1)
+            inputvector = np.array([head_x_n, head_y_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n])
             
             #multiply W1 with inputvector and apply activation function to each entry
-            layer1_output = np.tanh(np.matmul(W1, inputvector))
+            layer1_output = np.tanh(np.matmul(W1, inputvector) + b1)
     
-            #append a one to the vector for the bias
-            layer1_output = np.append(layer1_output, 1)
-            layer1_output = layer1_output.reshape(9,1)
+            layer2_output = np.tanh(np.matmul(W2, layer1_output) + b2)
     
-            #apply activation function to each entry
-            layer2_output = np.tanh(np.matmul(W2, layer1_output))
-    
-            #append a one to the vector for the bias
-            layer2_output = np.append(layer2_output, 1)
-            layer2_output = layer2_output.reshape(9,1)
-    
-            outputvector = vsigmoid(np.matmul(W3, layer2_output))
+            outputvector = sc.vsigmoid(np.matmul(W3, layer2_output) + b3)
     
             #rescale outputvector to get probabilities
             total_sum = outputvector[0] + outputvector[1] + outputvector[2] + outputvector[3]
@@ -241,58 +293,87 @@ best_list_data = [[-1]]*BEST_SIZE
 gen_fstr = "{:=" + str(1+int(np.log10(MAX_GENS))) + "}"
 nncnt_fstr = "{:=" + str(int(np.log10(POP_SIZE))) + "}"
 
-for gen in range(1,MAX_GENS+1):
+for gen in range(1, MAX_GENS + 1):
     #stores the BEST_SIZE best total scores of this generation
     #initially it stores dummy scores of -1 such that the first scores reached automatically get in the list
     best_list = [-1]*BEST_SIZE
 
     #stores the best weight matrices of this generation along with their total scores
     #initially it stores dummy scores of -1
-    #data will be stored in the format [fitness, W1, W2, W3]
+    #data will be stored in the format [fitness, W1, b1, W2, b2, W3, b3, idx]
     tmp_best_list_data = [[-1]]*BEST_SIZE
     
     cnt = 0
     while cnt < POP_SIZE:
         if gen == 1:
             #in the first generation create weight matrices randomly
-            #one input layer with 9 neurons
+            #one input layer with 6 neurons
             #two hidden layers with 8 neurons each
             #one output layer with 4 neurons
-            #last column of each weight matrix is for the bias
-            #W1 = np.random.uniform(-2, 2, (8,10))
-            W1 = np.random.uniform(-1, 1, (8,7))
-            W2 = np.random.uniform(-1, 1, (8,9))
-            W3 = np.random.uniform(-1, 1, (4,9))
+            
+            W1 = np.random.uniform(-1, 1, (8,6))
+            b1 = np.zeros(8)
+            W2 = np.random.uniform(-1, 1, (8,8))
+            b2 = np.zeros(8)
+            W3 = np.random.uniform(-1, 1, (4,8))
+            b3 = np.zeros(4)
+            '''#DEBUG
+            npzfile = np.load(f"./debug/gen{gen}_cnt{cnt}_gen_{gen}-cnt_{cnt}.npz")
+            W1 = npzfile['W1']
+            b1 = npzfile['b1']
+            W2 = npzfile['W2']
+            b2 = npzfile['b2']
+            W3 = npzfile['W3']
+            b3 = npzfile['b3']'''
+            idx = f"gen_{gen}-cnt_{cnt}"
         else:
             #from generation 2 onwards
             if cnt in range(0, BEST_SIZE):
                 #take the unmodified versions of the previous generation
                 W1 = best_list_data[cnt][1]
-                W2 = best_list_data[cnt][2]
-                W3 = best_list_data[cnt][3]
+                b1 = best_list_data[cnt][2]
+                W2 = best_list_data[cnt][3]
+                b2 = best_list_data[cnt][4]
+                W3 = best_list_data[cnt][5]
+                b3 = best_list_data[cnt][6]
+                idx = best_list_data[cnt][7] + "-U"
             elif cnt in range(BEST_SIZE, (OFFSPRING_SIZE+1)*BEST_SIZE):
                 #subsequently take slightly altered offspring
-                W1 = best_list_data[cnt%BEST_SIZE][1]
-                mutate(W1, MUT_RATE)
-                W2 = best_list_data[cnt%BEST_SIZE][2]
-                mutate(W2, MUT_RATE)
-                W3 = best_list_data[cnt%BEST_SIZE][3]
-                mutate(W3, MUT_RATE)
+                W1 = mutate(best_list_data[cnt%BEST_SIZE][1], MUT_RATE)
+                b1 = mutate(best_list_data[cnt%BEST_SIZE][2], MUT_RATE)
+                W2 = mutate(best_list_data[cnt%BEST_SIZE][3], MUT_RATE)
+                b2 = mutate(best_list_data[cnt%BEST_SIZE][4], MUT_RATE)
+                W3 = mutate(best_list_data[cnt%BEST_SIZE][5], MUT_RATE)
+                b3 = mutate(best_list_data[cnt%BEST_SIZE][6], MUT_RATE)
+
+                idx = best_list_data[cnt%BEST_SIZE][7] + f"-V{cnt//BEST_SIZE}"
             else:
                 #generate the rest randomly
-                #W1 = np.random.uniform(-1, 1, (8,10))
-                W1 = np.random.uniform(-1, 1, (8,7))
-                W2 = np.random.uniform(-1, 1, (8,9))
-                W3 = np.random.uniform(-1, 1, (4,9))
-                
-        fitness = get_fitness(W1, W2, W3)
+                W1 = np.random.uniform(-1, 1, (8,6))
+                b1 = np.zeros(8)
+                W2 = np.random.uniform(-1, 1, (8,8))
+                b2 = np.zeros(8)
+                W3 = np.random.uniform(-1, 1, (4,8))
+                b3 = np.zeros(4)
+                '''#DEBUG
+                npzfile = np.load(f"./debug/gen{gen}_cnt{cnt}_gen_{gen}-cnt_{cnt}.npz")
+                W1 = npzfile['W1']
+                b1 = npzfile['b1']
+                W2 = npzfile['W2']
+                b2 = npzfile['b2']
+                W3 = npzfile['W3']
+                b3 = npzfile['b3']'''
+                idx = f"gen_{gen}-cnt_{cnt}"
+        '''#DEBUG
+        np.savez(f"./generations/debug/gen{gen}_cnt{cnt}_{idx}", W1=W1, b1=b1, W2=W2, b2=b2, W3=W3, b3=b3)  '''      
+        fitness = get_fitness2(W1, b1, W2, b2, W3, b3)
         if fitness > best_list[0]:
             #NN is under the BEST_SIZE best so far
             #replace the worst with the current one	
             for j in range(len(tmp_best_list_data)):
                 if tmp_best_list_data[j][0] == best_list[0]:
                     #now we have found a worst candidate and replace it
-                    tmp_best_list_data[j] = [fitness, W1, W2, W3, str(cnt)]
+                    tmp_best_list_data[j] = [fitness, W1, b1, W2, b2, W3, b3, idx]
                     break
             #replace a worst score with the current one
             best_list[0] = fitness
@@ -306,9 +387,10 @@ for gen in range(1,MAX_GENS+1):
 
     #save the best BEST_SIZE weight matrices
     #first create folder for the generation
-    os.mkdir("./generations/Gen_" + str(gen))
+    os.mkdir(f"./generations/Gen_{gen}")
     for j in range(len(tmp_best_list_data)):
-        np.savez("./generations/Gen_" + str(gen) + "/" + str(best_list_data[j][4]) + "_fit=" + str(best_list_data[j][0]), W1=best_list_data[j][1], W2=best_list_data[j][2], W3=best_list_data[j][3])
-    f = open("./generations/stats.txt", "a")
-    f.write("Generation = " + str("{:03d}".format(gen)) + "\tMin = " + str("{:7.5f}".format(best_list[0])) + "\tMedian = " + str("{:7.5f}".format(best_list[int(BEST_SIZE/2)])) + "\tMax = " + str("{:7.5f}".format(best_list[BEST_SIZE-1])) + "\n")
-    f.close()
+        np.savez(f"./generations/Gen_{gen}/{best_list_data[j][7]}_fit={best_list_data[j][0]}", W1=best_list_data[j][1], b1=best_list_data[j][2],
+                 W2=best_list_data[j][3], b2=best_list_data[j][4], W3=best_list_data[j][5], b3=best_list_data[j][6])
+    
+    with open("./generations/stats.txt", "a") as f:
+        f.write(f"Generation = {gen:03d}\tMin = {best_list[0]:7.5f}\tMedian = {best_list[int(BEST_SIZE/2)]:7.5f}\tMax = {best_list[BEST_SIZE-1]:7.5f}\n")
