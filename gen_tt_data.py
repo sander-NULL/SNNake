@@ -8,7 +8,7 @@ import os
 import csv
 import snake_core as sc
 
-def write_data(path, start = 0, stepsize = 2):
+def write_data(path, start=0, stepsize=2):
     with open(path, 'w', newline='') as file:
         writer = csv.writer(file)
         for head_x in range(start, sc.FIELD_WIDTH, stepsize):

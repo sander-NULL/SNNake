@@ -80,7 +80,7 @@ def game():
     W2 = np.random.uniform(-1, 1, (8,8))
     W3 = np.random.uniform(-1, 1, (4,8))'''
     
-    npzfile = np.load("gen_1-cnt_47-V1-U-U_fit=0.3040000000000002.npz")
+    npzfile = np.load("gen_1-cnt_243-3-U-U-1-2-U-1-U-1-3-3-U-2-1-2-3-U-1-3-U-1-U-2-3-2-U-3-3-1-U-U-2-U-2-2-U-U-1-U_fit=0.5208333333333334.npz")
     W1 = npzfile['W1']
     b1 = npzfile['b1']
     W2 = npzfile['W2']

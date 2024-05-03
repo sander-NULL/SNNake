@@ -9,6 +9,7 @@ import shutil
 import random
 import numpy as np
 import snake_core as sc
+import csv
 
 '''
 To do:
@@ -16,6 +17,7 @@ To do:
 2. What if (OFFSPRING_SIZE + 1) * BEST_SIZE <= POP_SIZE does not hold?
 3. Best lists values initialization with -1 is bad
 4. while cnt to for cnt
+5. No need to test the best_size first from the 2nd gen onwards
 '''
 #size of each population
 POP_SIZE = 1000
@@ -39,32 +41,46 @@ MAX_ROUNDS = 20
 MAX_GENS = 40
 
 #the mutation rate controls how big the alteration of the weight matrices is
-MUT_RATE = 0.01
+MUT_RATE = 0.05
+
+if not os.path.exists('./fit_data/test_bench.csv'):
+    if input('No test bench data found for computing fitness. Generate? (Y/n) ') == 'Y':
+        import gen_fit_data
+    else:
+        print('Can\'t proceed without test bench data. Exiting.')
+        exit()
+
+test_bench = []
+#for calculating maximal possible score
+max_score = 0
+with open('./fit_data/test_bench.csv', newline='') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            invec = np.array(row[0:6], dtype=int)
+            pos_score = np.array(row[6:10], dtype=int)
+            max_score += pos_score.max()
+            test_bench.append((invec, pos_score))
     
 #check whether there is data from a previous run
-if os.path.exists("./generations"):
-    usr_input = input("Data from a previous run seems to exist in ./generations/. Erase this folder? (Y/n)\n")
-    if usr_input == "Y":
-        print("Erasing data...")
-        shutil.rmtree("./generations")
-        print("Done.")
+if os.path.exists('./generations'):
+    if input('Data from a previous run seems to exist in ./generations/. Erase this folder? (Y/n) ') == 'Y':
+        print('Erasing data...')
+        shutil.rmtree('./generations')
+        print('Done.')
     else:
-        print("Keeping data. Exiting.")
+        print('Keeping data. Exiting.')
         exit()
 
 #create folder for saving data
-os.mkdir("./generations")
+os.mkdir('./generations')
 
-#DEBUG
-#os.mkdir("./generations/debug")
-
-with open("./generations/stats.txt", "a") as f:
-    f.write(f"POP_SIZE = {POP_SIZE}\n")
-    f.write(f"BEST_SIZE = {BEST_SIZE}\n")
-    f.write(f"OFFSPRING_SIZE = {OFFSPRING_SIZE}\n")
-    f.write(f"MAX_ROUNDS = {MAX_ROUNDS}\n")
-    f.write(f"MAX_GENS = {MAX_GENS}\n")
-    f.write(f"MUT_RATE = {MUT_RATE}\n\n")
+with open('./generations/stats.txt', 'a') as f:
+    f.write(f'POP_SIZE = {POP_SIZE}\n')
+    f.write(f'BEST_SIZE = {BEST_SIZE}\n')
+    f.write(f'OFFSPRING_SIZE = {OFFSPRING_SIZE}\n')
+    f.write(f'MAX_ROUNDS = {MAX_ROUNDS}\n')
+    f.write(f'MAX_GENS = {MAX_GENS}\n')
+    f.write(f'MUT_RATE = {MUT_RATE}\n\n')
 
 #alters the entries of an array
 def mutate(array, rate):
@@ -74,67 +90,32 @@ def mutate(array, rate):
             x[...] += np.random.normal(0, rate)
     return mutated
 
-def get_fitness2(W1, b1, W2, b2, W3, b3):
+def get_fitness(test_bench, W1, b1, W2, b2, W3, b3):
     fitness = 0
-    for head_x in range(1, sc.FIELD_WIDTH - 1, 4):
-        for head_y in range(1, sc.FIELD_HEIGHT - 1, 5):
-            for shift_x in range(1, sc.FIELD_WIDTH - 2, 5):
-                food_x = 1 + (head_x - 1 + shift_x) % (sc.FIELD_WIDTH-2)
-                for shift_y in range(1, sc.FIELD_HEIGHT - 2, 5):
-                    food_y = 1 + (head_y - 1 + shift_y) % (sc.FIELD_HEIGHT-2)                    
-                    init_distance = abs(head_x - food_x) + abs(head_y - food_y)
-                    for head_x_change, head_y_change in ((0,0), (-1,0), (1,0), (0,-1), (0,1)):
-            
-                        #inputvector = np.array([head_x_n, head_y_n, tail_x_n, tail_y_n, snake_length_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n, 1]).reshape(10,1)
-                        inputvector = sc.normalize(np.array([head_x, head_y, head_x_change, head_y_change, food_x, food_y]))
-                        
-                        #multiply W1 with inputvector and apply activation function to each entry
-                        layer1_output = np.tanh(np.matmul(W1, inputvector) + b1)
-                
-                        layer2_output = np.tanh(np.matmul(W2, layer1_output) + b2)
-                
-                        outputvector = sc.vsigmoid(np.matmul(W3, layer2_output) + b3)
-                
-                        #rescale outputvector to get probabilities
-                        total_sum = outputvector[0] + outputvector[1] + outputvector[2] + outputvector[3]
-                        outputvector = 1/total_sum * outputvector
-                        
-                        #check at what index maximal value is contained
-                        key = np.argmax(outputvector)
-                        if (key == 0):
-                            #move left
-                            if (head_x_change == 0):
-                                head_x_change = -1
-                                head_y_change = 0
-                        elif (key == 1):
-                            #move up
-                            if (head_y_change == 0):
-                                head_y_change = -1
-                                head_x_change = 0
-                        elif (key == 2):
-                            #move right
-                            if (head_x_change == 0):
-                                head_x_change = 1
-                                head_y_change = 0
-                        elif (key == 3):
-                            #move down
-                            if (head_y_change == 0):
-                                head_y_change = 1
-                                head_x_change = 0
-                
-                        #get new head coordinates
-                        new_head_x = head_x + head_x_change
-                        new_head_y = head_y + head_y_change
-                        
-                        distance = abs(new_head_x - food_x) + abs(new_head_y - food_y)
-                        if distance < init_distance:
-                            fitness += 0.001
-                        else:
-                            fitness -= 0.001
-    return fitness
+    for input_data, pos_score in test_bench:
+
+        #inputvector = np.array([head_x_n, head_y_n, tail_x_n, tail_y_n, snake_length_n, head_x_change_n, head_y_change_n, food_x_n, food_y_n, 1]).reshape(10,1)
+        inputvector = sc.normalize(input_data)
+
+        #multiply W1 with inputvector and apply activation function to each entry
+        layer1_output = np.tanh(np.matmul(W1, inputvector) + b1)
+
+        layer2_output = np.tanh(np.matmul(W2, layer1_output) + b2)
+
+        outputvector = sc.vsigmoid(np.matmul(W3, layer2_output) + b3)
+
+        #rescale outputvector to get probabilities
+        total_sum = outputvector[0] + outputvector[1] + outputvector[2] + outputvector[3]
+        outputvector = 1/total_sum * outputvector
+        
+        direction = np.zeros(4, dtype = int)
+        direction[np.argmax(outputvector)] = 1
+        
+        fitness += np.dot(direction, pos_score)
+    return fitness/max_score
                     
                 
-def get_fitness(W1, b1, W2, b2, W3, b3):
+def get_fitness_old(W1, b1, W2, b2, W3, b3):
     fitness = 0
     for _ in range(0, MAX_ROUNDS):
         #Let the NN play MAX_ROUNDS rounds
@@ -246,7 +227,7 @@ def get_fitness(W1, b1, W2, b2, W3, b3):
             if (head_x == food_x) and (head_y == food_y):
                 if sc.FIELD_WIDTH * sc.FIELD_HEIGHT - snake_length == 0:
                     #perfect game
-                    print("Perfect Game!")
+                    print('Perfect Game!')
                     game_over = True
                 else:
                     #create random block for new food position and map it onto field blocks without snake blocks
@@ -279,7 +260,7 @@ def get_fitness(W1, b1, W2, b2, W3, b3):
         #else:
         #    fitness+=snake_length - 1
         fitness += snake_length - 1 + moves/(moves + 10)
-        #print("(fitness, score, moves) in round " + str(_) + " = (" + str(fitness) + ", " + str(snake_length-1) + ", " + str(moves) + ")")
+        #print('(fitness, score, moves) in round ' + str(_) + ' = (' + str(fitness) + ', ' + str(snake_length-1) + ', ' + str(moves) + ')')
         #input()
     fitness/=MAX_ROUNDS    
     return fitness
@@ -290,16 +271,16 @@ def get_fitness(W1, b1, W2, b2, W3, b3):
 best_list_data = [[-1]]*BEST_SIZE
 
 #define format strings for nice output later
-gen_fstr = "{:=" + str(1+int(np.log10(MAX_GENS))) + "}"
-nncnt_fstr = "{:=" + str(int(np.log10(POP_SIZE))) + "}"
+gen_fstr = '{:=' + str(1+int(np.log10(MAX_GENS))) + '}'
+nncnt_fstr = '{:=' + str(int(np.log10(POP_SIZE))) + '}'
 
 for gen in range(1, MAX_GENS + 1):
-    #stores the BEST_SIZE best total scores of this generation
-    #initially it stores dummy scores of -1 such that the first scores reached automatically get in the list
+    #stores the BEST_SIZE best fitness values of this generation
+    #initially it stores dummy scores of -1 such that the first fitness values achieved automatically get in the list
     best_list = [-1]*BEST_SIZE
 
-    #stores the best weight matrices of this generation along with their total scores
-    #initially it stores dummy scores of -1
+    #stores the best weight matrices of this generation along with their fitness values
+    #initially it stores dummy fitness values of -1
     #data will be stored in the format [fitness, W1, b1, W2, b2, W3, b3, idx]
     tmp_best_list_data = [[-1]]*BEST_SIZE
     
@@ -310,22 +291,13 @@ for gen in range(1, MAX_GENS + 1):
             #one input layer with 6 neurons
             #two hidden layers with 8 neurons each
             #one output layer with 4 neurons
-            
             W1 = np.random.uniform(-1, 1, (8,6))
             b1 = np.zeros(8)
             W2 = np.random.uniform(-1, 1, (8,8))
             b2 = np.zeros(8)
             W3 = np.random.uniform(-1, 1, (4,8))
             b3 = np.zeros(4)
-            '''#DEBUG
-            npzfile = np.load(f"./debug/gen{gen}_cnt{cnt}_gen_{gen}-cnt_{cnt}.npz")
-            W1 = npzfile['W1']
-            b1 = npzfile['b1']
-            W2 = npzfile['W2']
-            b2 = npzfile['b2']
-            W3 = npzfile['W3']
-            b3 = npzfile['b3']'''
-            idx = f"gen_{gen}-cnt_{cnt}"
+            idx = f'gen_{gen}-cnt_{cnt}'
         else:
             #from generation 2 onwards
             if cnt in range(0, BEST_SIZE):
@@ -336,7 +308,7 @@ for gen in range(1, MAX_GENS + 1):
                 b2 = best_list_data[cnt][4]
                 W3 = best_list_data[cnt][5]
                 b3 = best_list_data[cnt][6]
-                idx = best_list_data[cnt][7] + "-U"
+                idx = best_list_data[cnt][7] + '-U'
             elif cnt in range(BEST_SIZE, (OFFSPRING_SIZE+1)*BEST_SIZE):
                 #subsequently take slightly altered offspring
                 W1 = mutate(best_list_data[cnt%BEST_SIZE][1], MUT_RATE)
@@ -346,7 +318,7 @@ for gen in range(1, MAX_GENS + 1):
                 W3 = mutate(best_list_data[cnt%BEST_SIZE][5], MUT_RATE)
                 b3 = mutate(best_list_data[cnt%BEST_SIZE][6], MUT_RATE)
 
-                idx = best_list_data[cnt%BEST_SIZE][7] + f"-V{cnt//BEST_SIZE}"
+                idx = best_list_data[cnt%BEST_SIZE][7] + f'-{cnt//BEST_SIZE}'
             else:
                 #generate the rest randomly
                 W1 = np.random.uniform(-1, 1, (8,6))
@@ -355,18 +327,8 @@ for gen in range(1, MAX_GENS + 1):
                 b2 = np.zeros(8)
                 W3 = np.random.uniform(-1, 1, (4,8))
                 b3 = np.zeros(4)
-                '''#DEBUG
-                npzfile = np.load(f"./debug/gen{gen}_cnt{cnt}_gen_{gen}-cnt_{cnt}.npz")
-                W1 = npzfile['W1']
-                b1 = npzfile['b1']
-                W2 = npzfile['W2']
-                b2 = npzfile['b2']
-                W3 = npzfile['W3']
-                b3 = npzfile['b3']'''
-                idx = f"gen_{gen}-cnt_{cnt}"
-        '''#DEBUG
-        np.savez(f"./generations/debug/gen{gen}_cnt{cnt}_{idx}", W1=W1, b1=b1, W2=W2, b2=b2, W3=W3, b3=b3)  '''      
-        fitness = get_fitness2(W1, b1, W2, b2, W3, b3)
+                idx = f'gen_{gen}-cnt_{cnt}' 
+        fitness = get_fitness(test_bench, W1, b1, W2, b2, W3, b3)
         if fitness > best_list[0]:
             #NN is under the BEST_SIZE best so far
             #replace the worst with the current one	
@@ -379,7 +341,7 @@ for gen in range(1, MAX_GENS + 1):
             best_list[0] = fitness
             #sort the list again
             best_list.sort()
-        print("Generation " + gen_fstr.format(gen) + "/" + str(MAX_GENS) + " NN #" + nncnt_fstr.format(cnt) + " | Min = " + "{:+7.5f}".format(best_list[0]) + " Median = " + "{:+7.5f}".format(best_list[int(BEST_SIZE/2)]) + " Max = " + "{:+7.5f}".format(best_list[BEST_SIZE-1]), end='\r')
+        print('Generation ' + gen_fstr.format(gen) + '/' + str(MAX_GENS) + ' NN #' + nncnt_fstr.format(cnt) + ' | Min = ' + '{:+7.5f}'.format(best_list[0]) + ' Median = ' + '{:+7.5f}'.format(best_list[int(BEST_SIZE/2)]) + ' Max = ' + '{:+7.5f}'.format(best_list[BEST_SIZE-1]), end='\r')
         cnt+=1
     
     print()
@@ -387,10 +349,10 @@ for gen in range(1, MAX_GENS + 1):
 
     #save the best BEST_SIZE weight matrices
     #first create folder for the generation
-    os.mkdir(f"./generations/Gen_{gen}")
+    os.mkdir(f'./generations/gen_{gen}')
     for j in range(len(tmp_best_list_data)):
-        np.savez(f"./generations/Gen_{gen}/{best_list_data[j][7]}_fit={best_list_data[j][0]}", W1=best_list_data[j][1], b1=best_list_data[j][2],
+        np.savez(f'./generations/gen_{gen}/{best_list_data[j][7]}_fit={best_list_data[j][0]}', W1=best_list_data[j][1], b1=best_list_data[j][2],
                  W2=best_list_data[j][3], b2=best_list_data[j][4], W3=best_list_data[j][5], b3=best_list_data[j][6])
     
-    with open("./generations/stats.txt", "a") as f:
-        f.write(f"Generation = {gen:03d}\tMin = {best_list[0]:7.5f}\tMedian = {best_list[int(BEST_SIZE/2)]:7.5f}\tMax = {best_list[BEST_SIZE-1]:7.5f}\n")
+    with open('./generations/stats.txt', 'a') as f:
+        f.write(f'Generation = {gen:03d}\tMin = {best_list[0]:7.5f}\tMedian = {best_list[int(BEST_SIZE/2)]:7.5f}\tMax = {best_list[BEST_SIZE-1]:7.5f}\n')
