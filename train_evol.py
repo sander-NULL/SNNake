@@ -16,14 +16,12 @@ To do:
 1. perfect game notification
 2. What if (OFFSPRING_SIZE + 1) * BEST_SIZE <= POP_SIZE does not hold?
 3. Best lists values initialization with -1 is bad
-4. while cnt to for cnt
-5. No need to test the best_size first from the 2nd gen onwards
 '''
 #size of each population
-POP_SIZE = 1000
+POP_SIZE = 10
 
 #amount of individuals that get to reproduce
-BEST_SIZE = 200
+BEST_SIZE = 2
 
 #amount of individuals each NN can create as offspring
 OFFSPRING_SIZE = 3
@@ -274,19 +272,19 @@ best_list_data = [[-1]]*BEST_SIZE
 gen_fstr = '{:=' + str(1+int(np.log10(MAX_GENS))) + '}'
 nncnt_fstr = '{:=' + str(int(np.log10(POP_SIZE))) + '}'
 
-for gen in range(1, MAX_GENS + 1):
-    #stores the BEST_SIZE best fitness values of this generation
-    #initially it stores dummy scores of -1 such that the first fitness values achieved automatically get in the list
-    best_list = [-1]*BEST_SIZE
+#stores the BEST_SIZE best fitness values of this generation
+#initially it stores dummy scores of -1 such that the first fitness values achieved automatically get in the list
+best_list = [-1]*BEST_SIZE
 
-    #stores the best weight matrices of this generation along with their fitness values
-    #initially it stores dummy fitness values of -1
-    #data will be stored in the format [fitness, W1, b1, W2, b2, W3, b3, idx]
-    tmp_best_list_data = [[-1]]*BEST_SIZE
-    
+#stores the best weight matrices of this generation along with their fitness values
+#initially it stores dummy fitness values of -1
+#data will be stored in the format [fitness, W1, b1, W2, b2, W3, b3, idx]
+best_list_data = [[-1]]*BEST_SIZE
+
+for gen in range(1, MAX_GENS + 1):    
     cnt = 0
     while cnt < POP_SIZE:
-        if gen == 1:
+        if gen == 1:            
             #in the first generation create weight matrices randomly
             #one input layer with 6 neurons
             #two hidden layers with 8 neurons each
@@ -300,16 +298,12 @@ for gen in range(1, MAX_GENS + 1):
             idx = f'gen_{gen}-cnt_{cnt}'
         else:
             #from generation 2 onwards
-            if cnt in range(0, BEST_SIZE):
-                #take the unmodified versions of the previous generation
-                W1 = best_list_data[cnt][1]
-                b1 = best_list_data[cnt][2]
-                W2 = best_list_data[cnt][3]
-                b2 = best_list_data[cnt][4]
-                W3 = best_list_data[cnt][5]
-                b3 = best_list_data[cnt][6]
-                idx = best_list_data[cnt][7] + '-U'
-            elif cnt in range(BEST_SIZE, (OFFSPRING_SIZE+1)*BEST_SIZE):
+            if cnt == 0:
+                for cnt in range(0, BEST_SIZE):
+                    #take the unmodified versions of the previous generation
+                    best_list_data[cnt][7] += '-U'
+                cnt += 1
+            if cnt in range(BEST_SIZE, (OFFSPRING_SIZE+1)*BEST_SIZE):
                 #subsequently take slightly altered offspring
                 W1 = mutate(best_list_data[cnt%BEST_SIZE][1], MUT_RATE)
                 b1 = mutate(best_list_data[cnt%BEST_SIZE][2], MUT_RATE)
@@ -332,10 +326,10 @@ for gen in range(1, MAX_GENS + 1):
         if fitness > best_list[0]:
             #NN is under the BEST_SIZE best so far
             #replace the worst with the current one	
-            for j in range(len(tmp_best_list_data)):
-                if tmp_best_list_data[j][0] == best_list[0]:
+            for j in range(len(best_list_data)):
+                if best_list_data[j][0] == best_list[0]:
                     #now we have found a worst candidate and replace it
-                    tmp_best_list_data[j] = [fitness, W1, b1, W2, b2, W3, b3, idx]
+                    best_list_data[j] = [fitness, W1, b1, W2, b2, W3, b3, idx]
                     break
             #replace a worst score with the current one
             best_list[0] = fitness
@@ -345,12 +339,11 @@ for gen in range(1, MAX_GENS + 1):
         cnt+=1
     
     print()
-    best_list_data = tmp_best_list_data
 
     #save the best BEST_SIZE weight matrices
     #first create folder for the generation
     os.mkdir(f'./generations/gen_{gen}')
-    for j in range(len(tmp_best_list_data)):
+    for j in range(len(best_list_data)):
         np.savez(f'./generations/gen_{gen}/{best_list_data[j][7]}_fit={best_list_data[j][0]}', W1=best_list_data[j][1], b1=best_list_data[j][2],
                  W2=best_list_data[j][3], b2=best_list_data[j][4], W3=best_list_data[j][5], b3=best_list_data[j][6])
     
