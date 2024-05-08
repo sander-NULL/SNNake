@@ -11,6 +11,10 @@ import itertools
 import numpy as np
 import snake_core as sc
 
+'''
+TODO: 1. None transform
+'''
+
 def translate(string):
     if string == "LEFT":
         return torch.tensor([1.0,0,0,0])

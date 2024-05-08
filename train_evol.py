@@ -18,10 +18,10 @@ To do:
 3. Best lists values initialization with -1 is bad
 '''
 #size of each population
-POP_SIZE = 10
+POP_SIZE = 1000
 
 #amount of individuals that get to reproduce
-BEST_SIZE = 2
+BEST_SIZE = 200
 
 #amount of individuals each NN can create as offspring
 OFFSPRING_SIZE = 3
@@ -36,10 +36,10 @@ OFFSPRING_SIZE = 3
 MAX_ROUNDS = 20
 
 #maximal number of generations
-MAX_GENS = 40
+MAX_GENS = 100
 
 #the mutation rate controls how big the alteration of the weight matrices is
-MUT_RATE = 0.05
+MUT_RATE = 0.08
 
 if not os.path.exists('./fit_data/test_bench.csv'):
     if input('No test bench data found for computing fitness. Generate? (Y/n) ') == 'Y':
@@ -295,13 +295,13 @@ for gen in range(1, MAX_GENS + 1):
             b2 = np.zeros(8)
             W3 = np.random.uniform(-1, 1, (4,8))
             b3 = np.zeros(4)
-            idx = f'gen_{gen}-cnt_{cnt}'
+            idx = f'g{gen}-{cnt}_'
         else:
             #from generation 2 onwards
             if cnt == 0:
                 for cnt in range(0, BEST_SIZE):
                     #take the unmodified versions of the previous generation
-                    best_list_data[cnt][7] += '-U'
+                    pass#best_list_data[cnt][7] += 'U'
                 cnt += 1
             if cnt in range(BEST_SIZE, (OFFSPRING_SIZE+1)*BEST_SIZE):
                 #subsequently take slightly altered offspring
@@ -312,7 +312,7 @@ for gen in range(1, MAX_GENS + 1):
                 W3 = mutate(best_list_data[cnt%BEST_SIZE][5], MUT_RATE)
                 b3 = mutate(best_list_data[cnt%BEST_SIZE][6], MUT_RATE)
 
-                idx = best_list_data[cnt%BEST_SIZE][7] + f'-{cnt//BEST_SIZE}'
+                idx = best_list_data[cnt%BEST_SIZE][7] #+ f'{cnt//BEST_SIZE}'
             else:
                 #generate the rest randomly
                 W1 = np.random.uniform(-1, 1, (8,6))
@@ -321,7 +321,7 @@ for gen in range(1, MAX_GENS + 1):
                 b2 = np.zeros(8)
                 W3 = np.random.uniform(-1, 1, (4,8))
                 b3 = np.zeros(4)
-                idx = f'gen_{gen}-cnt_{cnt}' 
+                idx = f'g{gen}-{cnt}_' 
         fitness = get_fitness(test_bench, W1, b1, W2, b2, W3, b3)
         if fitness > best_list[0]:
             #NN is under the BEST_SIZE best so far
@@ -344,7 +344,7 @@ for gen in range(1, MAX_GENS + 1):
     #first create folder for the generation
     os.mkdir(f'./generations/gen_{gen}')
     for j in range(len(best_list_data)):
-        np.savez(f'./generations/gen_{gen}/{best_list_data[j][7]}_fit={best_list_data[j][0]}', W1=best_list_data[j][1], b1=best_list_data[j][2],
+        np.savez(f'./generations/gen_{gen}/{best_list_data[j][7]}_fit={best_list_data[j][0]:4.3f}', W1=best_list_data[j][1], b1=best_list_data[j][2],
                  W2=best_list_data[j][3], b2=best_list_data[j][4], W3=best_list_data[j][5], b3=best_list_data[j][6])
     
     with open('./generations/stats.txt', 'a') as f:
